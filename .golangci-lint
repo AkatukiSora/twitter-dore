@@ -1,0 +1,41 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+  allow-parallel-runners: true
+  modules-download-mode: readonly
+
+linters:
+  presets:
+    - bugs
+    - complexity
+    - format
+    - performance
+    - style
+    - unused
+  fast: false
+  disable:
+    # `style` preset enables godot which enforces trailing punctuation in comments; relax until docs updated.
+    - godot
+
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+  gocyclo:
+    min-complexity: 15
+  gocognit:
+    min-complexity: 15
+  funlen:
+    lines: 120
+    statements: 80
+  lll:
+    line-length: 140
+  misspell:
+    locale: US

@@ -1,0 +1,16 @@
+
+pre-commit:
+  commands:
+    golangci-lint:
+      run: golangci-lint run --fast-only
+    go mod tidy:
+      glob: "(go.mod|go.sum)"
+      run: go mod tidy
+    go fmt:
+      glob: "**/*.go"
+      run: go fmt {staged_files}
+
+pre-push:
+  commands:
+    golangci-lint:
+      run: golangci-lint run
