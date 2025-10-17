@@ -1,46 +1,102 @@
-/*
-Copyright © 2025 NAME HERE <EMAIL ADDRESS>
-*/
 package cmd
 
 import (
+	"context"
+	"fmt"
+	"io"
 	"os"
 
 	"github.com/spf13/cobra"
+
+	"github.com/AkatukiSora/twitter-dore/internal/ui"
 )
 
-// rootCmd represents the base command when called without any subcommands
-var rootCmd = &cobra.Command{
-	Use:   "twitter-dore",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
+const (
+	flagColor = "color"
+)
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	// Run: func(cmd *cobra.Command, args []string) { },
-}
+type colorContextKey struct{}
 
-// Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
+var (
+	rootCmd         = newRootCommand()
+	isTerminalFunc  = ui.IsTerminalWriter
+	defaultColorStr = "auto"
+)
+
+// Execute runs the CLI. This is kept small so main can stay trivial.
 func Execute() {
-	err := rootCmd.Execute()
-	if err != nil {
+	if err := rootCmd.Execute(); err != nil {
+		rootCmd.PrintErrln(fmt.Sprintf("Error: %v", err))
 		os.Exit(1)
 	}
 }
 
-func init() {
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
+// NewRootCmd returns a fresh instance of the root command, mainly for tests.
+func NewRootCmd() *cobra.Command {
+	return newRootCommand()
+}
 
-	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.twitter-dore.yaml)")
+func newRootCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "twitter-dore",
+		Short: "CLI helper for filling Twitter reply templates",
+		Long: `twitter-dore loads YAML templates for reply-style questions and guides you
+through filling placeholders interactively.`,
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return injectColorSettings(cmd)
+		},
+	}
 
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	cmd.PersistentFlags().String(flagColor, defaultColorStr, "Color output mode (auto|always|never)")
+
+	cmd.AddCommand(
+		newRunCmd(),
+		newNewCmd(),
+		newVersionCmd(),
+		newCompletionCmd(),
+	)
+
+	return cmd
+}
+
+func injectColorSettings(cmd *cobra.Command) error {
+	colorValue, err := cmd.Flags().GetString(flagColor)
+	if err != nil {
+		return err
+	}
+
+	mode, err := ui.ParseMode(colorValue)
+	if err != nil {
+		return fmt.Errorf("invalid color mode %q: %w", colorValue, err)
+	}
+
+	useColor := mode.Enabled(detectTTY(cmd.ErrOrStderr()))
+	settings := ui.ColorSettings{
+		Mode:    mode,
+		Enabled: useColor,
+	}
+
+	ctx := context.WithValue(cmd.Context(), colorContextKey{}, settings)
+	cmd.SetContext(ctx)
+
+	return nil
+}
+
+func getColorSettings(cmd *cobra.Command) ui.ColorSettings {
+	value := cmd.Context().Value(colorContextKey{})
+	if settings, ok := value.(ui.ColorSettings); ok {
+		return settings
+	}
+	// Should not happen, but fall back to defaults if pre-run didn't execute.
+	mode, _ := ui.ParseMode(defaultColorStr)
+	return ui.ColorSettings{
+		Mode:    mode,
+		Enabled: mode.Enabled(detectTTY(cmd.ErrOrStderr())),
+	}
+}
+
+func detectTTY(writer io.Writer) bool {
+	return isTerminalFunc(writer)
 }
