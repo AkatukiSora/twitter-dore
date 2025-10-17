@@ -1,0 +1,44 @@
+project_name: twitter-dore
+
+builds:
+  - id: twitter-dore
+    main: .
+    binary: twitter-dore
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/AkatukiSora/twitter-dore/cmd.version={{.Version}}
+      - -X github.com/AkatukiSora/twitter-dore/cmd.commit={{.ShortCommit}}
+
+archives:
+  - id: archive
+    builds:
+      - twitter-dore
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE
+
+sboms:
+  - artifacts: ["binary", "archive"]
+    format: cyclonedx-json
+
+checksums:
+  name_template: "{{ .ProjectName }}_checksums.txt"
+
+changelog:
+  use: github
+
+release:
+  prerelease: auto
+  draft: false
